@@ -1,3 +1,5 @@
+import numpy as np
+
 class Environment_search:
     def __init__ (self, num_user, C_total, R_n, R_C, state_dim, action_dim):
         self.num_user = num_user
