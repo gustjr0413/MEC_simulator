@@ -12,4 +12,4 @@ class Rmatrix():
         return np.argmax(self.M)
 
     def reset(self):
-        self.M = np.zeros(action_dim)
+        self.M = np.zeros(self.action_dim)

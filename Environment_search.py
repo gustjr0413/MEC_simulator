@@ -1,4 +1,6 @@
 import numpy as np
+import Rmatrix as Rm
+import transform as tr
 
 class Environment_search:
     def __init__ (self, num_user, C_total, R_n, R_C, state_dim, action_dim):
@@ -57,10 +59,10 @@ class Environment_search:
         T_lim = (D*H/C)*state[3]
         C0 = state[4]*(self.C_total)
         Cr = self.C_total-C0
-        M = Rmatrix(self.action_dim)
+        M = Rm.Rmatrix(self.action_dim)
         for idx in range(self.action_dim):
-            a = transform().to2dim(idx)[0]
-            b = transform().to2dim(idx)[1]
+            a = tr.transform().to2dim(idx)[0]
+            b = tr.transform().to2dim(idx)[1]
 
              # substitution
             A = (1/self.R_n) + (r/self.R_C) + (H/C)

@@ -1,2 +1,0 @@
-MEC_simulator
-
