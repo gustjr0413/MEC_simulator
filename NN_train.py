@@ -56,7 +56,7 @@ class TestDataset(Dataset):
         return self.len  
     
 
-xy = pd.get_dummies(pd.read_csv('final_dataset_newparam300_50000.csv')).values[:,1:]
+xy = pd.get_dummies(pd.read_csv('final_dataset_50000.csv')).values[:,1:]
 print("Dataset shape = {}".format(xy.shape))
 x_data = xy[:,0:6]
 y_data = xy[:,6:8]
