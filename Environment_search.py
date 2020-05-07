@@ -5,7 +5,7 @@ import transform as tr
 class Environment_search:
     def __init__ (self, num_user, C_total, R_n, R_C, state_dim, action_dim):
         self.num_user = num_user
-        self.r = 0.1 # Input/output ratio
+        self.r = 0.2 # Input/output ratio
         self.C_total = C_total # Total CPU capacity of server [Hz]
         self.R_n = R_n # user->server datarate [bps]
         self.R_C = R_C # server->user datarate [bps]
@@ -16,18 +16,20 @@ class Environment_search:
 
 
     def generate_user(self): # get user set
-        user_set = np.zeros([self.num_user,5])
-        C_list = np.linspace(0.1e9,1e9,10)
-        T_lim_list = np.array([0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1])
+        user_set = np.zeros([self.num_user,6])
+        C_list = np.array([2.84e9, 2.39e9, 2.5e9])
+        T_lim_list = np.array([0.1, 0.5, 1])
+        beta_list = np.array([1/2,1,2])
         idx = 0
         t_task_origin = 0
         for i in range(self.num_user):
-            ### [H,D,C,T_req,C0]
-            user_set[idx,0] = np.random.randint(low=500, high=1500+1) # H
-            user_set[idx,1] = 1000*8*np.random.randint(low=100, high=500+1) # D
-            user_set[idx,2] = C_list[np.random.randint(low=0, high=10)] # C
-            user_set[idx,3] = T_lim_list[np.random.randint(low=0,high=10)] # T_lim
-            user_set[idx,4] = np.random.randint(low=0, high=(self.C_total/1e9)+1)*1e9 # C0
+            ### [h,d,F_l,t_req,F_0,beta]
+            user_set[idx,0] = 2640 #np.random.randint(low=500, high=1500+1) # H
+            user_set[idx,1] = 1000*8*np.random.randint(low=100, high=300+1) # D
+            user_set[idx,2] = C_list[np.random.randint(low=0, high=3)] # C
+            user_set[idx,3] = T_lim_list[np.random.randint(low=0,high=3)] # T_lim
+            user_set[idx,4] = np.random.randint(low=0, high=(self.C_total/1e9)+1)*1e9
+            user_set[idx,5] = beta_list[np.random.randint(low=0,high=3)] # beta
             t_task_origin += np.ceil(user_set[idx,0]*user_set[idx,1]/user_set[idx,2])
             idx = idx + 1
         self.user_set=user_set
@@ -41,32 +43,34 @@ class Environment_search:
 
 
     def get_state(self):
-        """state = [H, D, C, T_lim, C0]"""
-        state = [self.user_set[self.index,0]/1500,
-                 self.user_set[self.index,1]/(1000*8*500),
-                 self.user_set[self.index,2]/(1e9),
+        """state = [h, d, F_l, t_req, F_0, beta]"""
+        state = [self.user_set[self.index,0]/2640,
+                 self.user_set[self.index,1]/(1000*8*300),
+                 (self.user_set[self.index,2]-2.39e9)/(2.84e9-2.39e9),
                  self.user_set[self.index,3],
-                 self.user_set[self.index,4]/(self.C_total)]
+                 self.user_set[self.index,4]/(self.C_total),
+                 self.user_set[self.index,5]/2]
         self.index+=1
-        return np.array(state)
+        return np.array(state), self.user_set[self.index-1,4]
 
 
     def search(self, state):
-        H = state[0]*1500
+        H = state[0]*2640
         r = self.r
-        D = state[1]*(1000*8*500)
-        C = state[2]*1e9
-        T_lim = (D*H/C)*state[3]
+        D = state[1]*(1000*8*300)
+        C = state[2]*(2.84e9-2.39e9)+2.39e9
+        T_lim = state[3]
         C0 = state[4]*(self.C_total)
+        beta = state[5]*2
         Cr = self.C_total-C0
-        M = Rm.Rmatrix(self.action_dim)
+        M = Rmatrix(self.action_dim)
         for idx in range(self.action_dim):
-            a = tr.transform().to2dim(idx)[0]
-            b = tr.transform().to2dim(idx)[1]
+            a = transform().to2dim(idx)[0]
+            b = transform().to2dim(idx)[1]
 
              # substitution
             A = (1/self.R_n) + (r/self.R_C) + (H/C)
-            B = (b*self.C_total) - (self.C_total**2)/C
+            B = (b*beta*self.C_total) - (self.C_total**2)/C
 
             # solution
             if ( B>=0 ):
@@ -74,29 +78,29 @@ class Environment_search:
             else:
                 # clip
 
-                C_b = (-(a*H)+np.sqrt((a**2)*(H**2)-2*a*A*B*H) )/(a*A)
+                C_b = (-(beta*a*H)+np.sqrt((beta**2)*(a**2)*(H**2)-beta*a*A*B*H) )/(beta*a*A)
                 C_min = (C*H*(D*H-C*T_lim))/(D*(H**2)-A*C*(D*H-C*T_lim))
-                C_max = ((2*self.C_total)/a)*( (self.C_total/C) - b)
+                C_max = ((self.C_total)/a)*( (self.C_total/(C*beta)) - b)
 
                 if (C_max < C_min ):
                     C_opt = 0
                 else:
                     C_opt= np.clip(C_b,C_min,C_max)
                 if( C_opt >= Cr):
-                    C_opt = Cr
-                    C_min = (C*H*(D*H-C*T_lim))/(D*(H**2)-A*C*(D*H-C*T_lim))
-                    if C_opt <= C_min:
-                        C_opt = 0
+                        C_opt = Cr
+                        C_min = (C*H*(D*H-C*T_lim))/(D*(H**2)-A*C*(D*H-C*T_lim))
+                        if C_opt <= C_min:
+                            C_opt = 0
 
-            if C_opt == 0 :
-                I_opt = 0
-            else:
-                I_opt = (D*H/C)/(A+(H/C_opt))
-                Cost_offloading = np.maximum( (1/self.R_n + r/self.R_C + H/C_opt)*I_opt  ,  (D-I_opt)*H/C ) + (a*C_opt+2*self.C_total*b)*(I_opt*H/(2*(self.C_total)**2))
-                Cost_non = D*H/C
-                if Cost_offloading > Cost_non:
-                    C_opt = 0
+                if C_opt == 0 :
                     I_opt = 0
+                else:
+                    I_opt = (D*H/C)/(A+(H/C_opt))
+                    Cost_offloading = np.maximum( (1/self.R_n + r/self.R_C + H/C_opt)*I_opt  ,  (D-I_opt)*H/C ) + beta*(a*C_opt+self.C_total*b)*(I_opt*H/((self.C_total)**2))
+                    Cost_non = D*H/C
+                    if Cost_offloading > Cost_non:
+                        C_opt = 0
+                        I_opt = 0
 
 
 
@@ -107,7 +111,7 @@ class Environment_search:
                 payment = 0
             else:
                 I_opt = (D*H/C)/(A+(H/C_opt))
-                payment =(a*C_opt+2*self.C_total*b)*(I_opt*H/(2*(self.C_total)**2))
+                payment =(a*C_opt+self.C_total*b)*(I_opt*H/((self.C_total)**2))
 
 
             M.update(idx, payment)
@@ -116,3 +120,4 @@ class Environment_search:
         max_payment = M.M[action]
         M.reset()
         return action, max_payment
+    
