@@ -1,6 +1,6 @@
 import numpy as np
-import Rmatrix as Rm
-import transform as tr
+from Rmatrix import Rmatrix
+from transform import transform
 
 class Environment_search:
     def __init__ (self, num_user, C_total, R_n, R_C, state_dim, action_dim):
@@ -24,8 +24,8 @@ class Environment_search:
         t_task_origin = 0
         for i in range(self.num_user):
             ### [h,d,F_l,t_req,F_0,beta]
-            user_set[idx,0] = 2640 #np.random.randint(low=500, high=1500+1) # H
-            user_set[idx,1] = 1000*8*np.random.randint(low=100, high=300+1) # D
+            user_set[idx,0] = 2640  # H
+            user_set[idx,1] = 1024*8*np.random.randint(low=100, high=300+1) # D
             user_set[idx,2] = C_list[np.random.randint(low=0, high=3)] # C
             user_set[idx,3] = T_lim_list[np.random.randint(low=0,high=3)] # T_lim
             user_set[idx,4] = np.random.randint(low=0, high=(self.C_total/1e9)+1)*1e9
@@ -45,7 +45,7 @@ class Environment_search:
     def get_state(self):
         """state = [h, d, F_l, t_req, F_0, beta]"""
         state = [self.user_set[self.index,0]/2640,
-                 self.user_set[self.index,1]/(1000*8*300),
+                 self.user_set[self.index,1]/(1024*8*300),
                  (self.user_set[self.index,2]-2.39e9)/(2.84e9-2.39e9),
                  self.user_set[self.index,3],
                  self.user_set[self.index,4]/(self.C_total),
@@ -57,7 +57,7 @@ class Environment_search:
     def search(self, state):
         H = state[0]*2640
         r = self.r
-        D = state[1]*(1000*8*300)
+        D = state[1]*(1024*8*300)
         C = state[2]*(2.84e9-2.39e9)+2.39e9
         T_lim = state[3]
         C0 = state[4]*(self.C_total)
@@ -120,4 +120,3 @@ class Environment_search:
         max_payment = M.M[action]
         M.reset()
         return action, max_payment
-    
